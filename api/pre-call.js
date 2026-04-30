@@ -34,11 +34,6 @@ module.exports = async function handler(req, res) {
         restaurant_opening_hours: restaurant.opening_hours,
         restaurant_menu_json: JSON.stringify(restaurant.menu || [])
       },
-      conversation_config_override: {
-        agent: {
-          first_message: restaurant.greeting
-        }
-      },
       user_id: restaurant.id
     });
   } catch (error) {

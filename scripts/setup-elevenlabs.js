@@ -125,7 +125,27 @@ async function createServerTool(publicBaseUrl) {
   return apiRequest("POST", "/convai/tools", payload);
 }
 
-async function createAgent(toolId) {
+async function createCreateOrderTool(publicBaseUrl) {
+  const templatePath = path.join(
+    process.cwd(),
+    "config",
+    "elevenlabs",
+    "tool.create-order.json"
+  );
+  const template = loadJson(templatePath);
+  const payload = deepReplace(template, {
+    "__PUBLIC_BASE_URL__": publicBaseUrl
+  });
+
+  const optionalAuthToken = process.env.TOOL_AUTH_TOKEN;
+  if (optionalAuthToken) {
+    payload.tool_config.api_schema.request_headers.Authorization = `Bearer ${optionalAuthToken}`;
+  }
+
+  return apiRequest("POST", "/convai/tools", payload);
+}
+
+async function createAgent(toolIds) {
   const templatePath = path.join(
     process.cwd(),
     "config",
@@ -134,10 +154,35 @@ async function createAgent(toolId) {
   );
   const template = loadJson(templatePath);
   const payload = deepReplace(template, {
-    "__TOOL_ID__": toolId
+    "__TOOL_GET_RESTAURANT_CONTEXT_ID__": toolIds.getRestaurantContext,
+    "__TOOL_CREATE_ORDER_ID__": toolIds.createOrder
   });
 
   return apiRequest("POST", "/convai/agents/create?enable_versioning=true", payload);
+}
+
+async function updateAgent(agentId, toolIds) {
+  const templatePath = path.join(
+    process.cwd(),
+    "config",
+    "elevenlabs",
+    "agent.pizza-bot.json"
+  );
+  const template = loadJson(templatePath);
+  const payload = deepReplace(template, {
+    "__TOOL_GET_RESTAURANT_CONTEXT_ID__": toolIds.getRestaurantContext,
+    "__TOOL_CREATE_ORDER_ID__": toolIds.createOrder
+  });
+
+  return apiRequest(
+    "PATCH",
+    `/convai/agents/${agentId}?enable_versioning_if_not_enabled=true`,
+    payload
+  );
+}
+
+async function getAgent(agentId) {
+  return apiRequest("GET", `/convai/agents/${agentId}`);
 }
 
 async function main() {
@@ -155,19 +200,51 @@ async function main() {
   console.log(JSON.stringify(settings, null, 2));
 
   console.log("\n3. Server Tool anlegen");
-  const tool = await createServerTool(publicBaseUrl);
-  console.log(JSON.stringify(tool, null, 2));
+  const restaurantTool = await createServerTool(publicBaseUrl);
+  console.log(JSON.stringify(restaurantTool, null, 2));
 
-  console.log("\n4. Agent anlegen");
-  const agent = await createAgent(tool.id);
+  console.log("\n4. Bestell-Tool anlegen");
+  const orderTool = await createCreateOrderTool(publicBaseUrl);
+  console.log(JSON.stringify(orderTool, null, 2));
+
+  const toolIds = {
+    getRestaurantContext: restaurantTool.id,
+    createOrder: orderTool.id
+  };
+
+  const existingAgentId = process.env.ELEVENLABS_AGENT_ID;
+  console.log(existingAgentId ? "\n5. Agent aktualisieren" : "\n5. Agent anlegen");
+  const agent = existingAgentId
+    ? await updateAgent(existingAgentId, toolIds)
+    : await createAgent(toolIds);
   console.log(JSON.stringify(agent, null, 2));
+
+  const resolvedAgentId = agent.agent_id || agent.id || existingAgentId;
+
+  console.log("\n6. Agent verifizieren");
+  const verifiedAgent = await getAgent(resolvedAgentId);
+  const attachedToolIds =
+    verifiedAgent?.conversation_config?.agent?.prompt?.tool_ids || [];
+  console.log(
+    JSON.stringify(
+      {
+        agent_id: verifiedAgent.agent_id,
+        tool_ids: attachedToolIds,
+        workflow_present: Boolean(verifiedAgent.workflow)
+      },
+      null,
+      2
+    )
+  );
 
   console.log("\nZusammenfassung");
   console.log(`Pre-call URL: ${publicBaseUrl}/api/pre-call`);
   console.log(`Post-call URL: ${publicBaseUrl}/api/post-call`);
   console.log(`Tool URL: ${publicBaseUrl}/api/tool/get-restaurant-context`);
-  console.log(`Tool ID: ${tool.id}`);
-  console.log(`Agent ID: ${agent.agent_id || agent.id || "unbekannt"}`);
+  console.log(`Create-order URL: ${publicBaseUrl}/api/tool/create-order`);
+  console.log(`Restaurant Tool ID: ${restaurantTool.id}`);
+  console.log(`Create-order Tool ID: ${orderTool.id}`);
+  console.log(`Agent ID: ${resolvedAgentId || "unbekannt"}`);
   console.log(`Webhook ID: ${webhook.webhook_id || webhook.id || "unbekannt"}`);
   console.log(`Webhook Secret: ${webhook.webhook_secret || "nicht von API zurueckgegeben"}`);
 }

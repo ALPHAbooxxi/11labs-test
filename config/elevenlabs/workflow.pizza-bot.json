@@ -1,0 +1,411 @@
+{
+  "workflow_name": "pizza-bot-multi-restaurant-order-flow",
+  "version": "1.0.0",
+  "scope": "all-restaurants",
+  "description": "Deterministic call workflow for all restaurants. Restaurant-specific behavior is driven by dynamic variables and restaurant settings from Supabase.",
+  "entry_state": "identify_restaurant",
+  "terminal_states": [
+    "close_after_information",
+    "close_after_order",
+    "handoff_to_human",
+    "close_unresolved"
+  ],
+  "restaurant_rules": {
+    "lookup_key": "called_number",
+    "dynamic_variables": [
+      "restaurant_id",
+      "restaurant_name",
+      "restaurant_phone_number",
+      "restaurant_greeting",
+      "restaurant_address",
+      "restaurant_opening_hours",
+      "restaurant_menu_json",
+      "restaurant_delivery_enabled",
+      "restaurant_pickup_enabled",
+      "restaurant_minimum_order_amount",
+      "restaurant_delivery_fee",
+      "restaurant_delivery_area_notes",
+      "restaurant_payment_methods_json",
+      "restaurant_handoff_phone_number",
+      "restaurant_special_notes"
+    ]
+  },
+  "intents": [
+    {
+      "id": "new_order",
+      "examples": [
+        "Ich moechte bestellen",
+        "Ich haette gern zwei Pizzen",
+        "Ich brauche Lieferung"
+      ]
+    },
+    {
+      "id": "opening_hours",
+      "examples": [
+        "Wie lange habt ihr offen",
+        "Wann schliesst ihr"
+      ]
+    },
+    {
+      "id": "address",
+      "examples": [
+        "Wo seid ihr",
+        "Wie ist eure Adresse"
+      ]
+    },
+    {
+      "id": "delivery_rules",
+      "examples": [
+        "Liefert ihr",
+        "Was kostet die Lieferung",
+        "Gibt es einen Mindestbestellwert"
+      ]
+    },
+    {
+      "id": "payment_question",
+      "examples": [
+        "Kann ich mit Karte zahlen",
+        "Welche Zahlungsmittel akzeptiert ihr"
+      ]
+    },
+    {
+      "id": "human_handoff",
+      "examples": [
+        "Ich will mit jemandem sprechen",
+        "Verbinden Sie mich bitte"
+      ]
+    },
+    {
+      "id": "unsupported_request",
+      "examples": [
+        "Ich habe eine Reklamation",
+        "Ich brauche Catering fuer morgen"
+      ]
+    }
+  ],
+  "slots": {
+    "order_items": {
+      "required_for": [
+        "new_order"
+      ],
+      "shape": [
+        "item_name",
+        "item_size",
+        "quantity",
+        "special_instructions"
+      ]
+    },
+    "fulfillment_type": {
+      "required_for": [
+        "new_order"
+      ],
+      "allowed_values": [
+        "pickup",
+        "delivery"
+      ]
+    },
+    "customer_name": {
+      "required_for": [
+        "pickup",
+        "delivery"
+      ]
+    },
+    "customer_phone": {
+      "required_for": [
+        "delivery"
+      ]
+    },
+    "delivery_address": {
+      "required_for": [
+        "delivery"
+      ]
+    }
+  },
+  "states": [
+    {
+      "id": "identify_restaurant",
+      "goal": "Read dynamic variables from pre-call and bind the conversation to the correct restaurant.",
+      "checks": [
+        "restaurant_id exists",
+        "restaurant_name exists",
+        "restaurant_menu_json is present or can be refreshed via get_restaurant_context"
+      ]
+    },
+    {
+      "id": "greet",
+      "goal": "Use restaurant_greeting and immediately speak in the name of the matched restaurant.",
+      "speak_style": "brief, warm, direct"
+    },
+    {
+      "id": "classify_intent",
+      "goal": "Route call into one of: new_order, opening_hours, address, delivery_rules, payment_question, human_handoff, unsupported_request.",
+      "fallback_question": "Wie kann ich Ihnen fuer {{restaurant_name}} helfen"
+    },
+    {
+      "id": "handle_information_request",
+      "goal": "Answer only from restaurant variables or get_restaurant_context.",
+      "allowed_topics": [
+        "opening_hours",
+        "address",
+        "delivery_rules",
+        "payment_question"
+      ]
+    },
+    {
+      "id": "collect_order_items",
+      "goal": "Capture item_name, item_size, quantity and special instructions using the actual menu only.",
+      "rules": [
+        "Never invent menu items",
+        "If size is ambiguous, ask a direct follow-up",
+        "If multiple items are ordered, confirm each one clearly"
+      ]
+    },
+    {
+      "id": "collect_fulfillment",
+      "goal": "Ask for pickup or delivery and enforce restaurant_delivery_enabled and restaurant_pickup_enabled.",
+      "decision_logic": [
+        "If only delivery is enabled, do not offer pickup",
+        "If only pickup is enabled, do not offer delivery",
+        "If both are enabled, ask the caller to choose"
+      ]
+    },
+    {
+      "id": "collect_customer_data",
+      "goal": "For delivery: collect name, callback number and full address. For pickup: collect at least name.",
+      "data_capture_rules": [
+        "Repeat phone numbers and addresses back when confidence is low",
+        "Keep each question atomic",
+        "Do not move forward if required details are missing"
+      ]
+    },
+    {
+      "id": "validate_rules",
+      "goal": "Check delivery availability, minimum order value, payment methods and any special restaurant notes.",
+      "validation_order": [
+        "menu validity",
+        "fulfillment availability",
+        "minimum order amount",
+        "delivery fee",
+        "payment methods",
+        "special notes"
+      ]
+    },
+    {
+      "id": "summarize_order",
+      "goal": "Read back items, quantities, fulfillment type, address if applicable, subtotal, delivery fee and total.",
+      "must_include": [
+        "restaurant_name",
+        "all items",
+        "item quantities",
+        "pickup or delivery",
+        "delivery address if applicable",
+        "subtotal",
+        "delivery fee if applicable",
+        "grand total"
+      ]
+    },
+    {
+      "id": "confirm_order",
+      "goal": "Require an explicit confirmation before writing the order.",
+      "accepted_confirmations": [
+        "ja",
+        "das passt",
+        "bitte so bestellen",
+        "bestellen"
+      ]
+    },
+    {
+      "id": "persist_order",
+      "goal": "Call create_order exactly once after confirmation.",
+      "tool": "create_order",
+      "payload_requirements": [
+        "restaurant_id",
+        "customer_name",
+        "fulfillment_type",
+        "items"
+      ]
+    },
+    {
+      "id": "close_after_information",
+      "goal": "Close politely after answering an information request."
+    },
+    {
+      "id": "close_after_order",
+      "goal": "Confirm that the order was saved and close politely."
+    },
+    {
+      "id": "handoff_to_human",
+      "goal": "Offer the restaurant_handoff_phone_number or promise a callback if the request cannot be resolved automatically."
+    },
+    {
+      "id": "close_unresolved",
+      "goal": "Close politely if the request remains unsupported and no handoff option exists."
+    }
+  ],
+  "transitions": [
+    {
+      "from": "identify_restaurant",
+      "to": "greet"
+    },
+    {
+      "from": "greet",
+      "to": "classify_intent"
+    },
+    {
+      "from": "classify_intent",
+      "to": "handle_information_request",
+      "when": "intent in [opening_hours, address, delivery_rules, payment_question]"
+    },
+    {
+      "from": "classify_intent",
+      "to": "collect_order_items",
+      "when": "intent == new_order"
+    },
+    {
+      "from": "classify_intent",
+      "to": "handoff_to_human",
+      "when": "intent == human_handoff or unsupported_request"
+    },
+    {
+      "from": "handle_information_request",
+      "to": "close_after_information"
+    },
+    {
+      "from": "collect_order_items",
+      "to": "collect_fulfillment"
+    },
+    {
+      "from": "collect_fulfillment",
+      "to": "collect_customer_data"
+    },
+    {
+      "from": "collect_customer_data",
+      "to": "validate_rules"
+    },
+    {
+      "from": "validate_rules",
+      "to": "summarize_order",
+      "when": "all rules satisfied"
+    },
+    {
+      "from": "validate_rules",
+      "to": "collect_order_items",
+      "when": "menu ambiguity or item correction required"
+    },
+    {
+      "from": "validate_rules",
+      "to": "collect_fulfillment",
+      "when": "fulfillment conflict or unavailable delivery/pickup"
+    },
+    {
+      "from": "summarize_order",
+      "to": "confirm_order"
+    },
+    {
+      "from": "confirm_order",
+      "to": "persist_order",
+      "when": "customer explicitly confirms"
+    },
+    {
+      "from": "confirm_order",
+      "to": "collect_order_items",
+      "when": "customer changes items"
+    },
+    {
+      "from": "persist_order",
+      "to": "close_after_order"
+    },
+    {
+      "from": "handoff_to_human",
+      "to": "close_unresolved",
+      "when": "no direct transfer is possible"
+    }
+  ],
+  "restaurant_specific_rules": [
+    "If restaurant_delivery_enabled is false, do not offer delivery.",
+    "If restaurant_pickup_enabled is false, do not offer pickup.",
+    "If delivery is chosen, enforce restaurant_minimum_order_amount and add restaurant_delivery_fee.",
+    "Only mention payment methods listed in restaurant_payment_methods_json.",
+    "If the caller asks for something outside the menu or policy, offer the handoff number from restaurant_handoff_phone_number if available.",
+    "Always honor restaurant_special_notes."
+  ],
+  "conversation_policies": [
+    "Keep turns short and phone-friendly.",
+    "Ask at most one missing critical question at a time.",
+    "Do not guess on menu, pricing, address, payment or policy details.",
+    "If the caller is unclear, summarize what has been understood and ask a correction question.",
+    "If there is background noise or ASR uncertainty, reconfirm critical slots before create_order."
+  ],
+  "failure_modes": [
+    {
+      "id": "missing_restaurant_context",
+      "action": "Call get_restaurant_context once using called_number, otherwise apologize and close."
+    },
+    {
+      "id": "invalid_menu_item",
+      "action": "Explain that the item is not on the menu and offer nearby alternatives from the actual menu."
+    },
+    {
+      "id": "size_mismatch",
+      "action": "Ask which valid size the caller wants before continuing."
+    },
+    {
+      "id": "minimum_order_not_met",
+      "action": "Explain the minimum order amount and ask whether the caller wants to add items or switch to pickup."
+    },
+    {
+      "id": "unsupported_request",
+      "action": "Offer handoff_phone_number if available, otherwise apologize and close."
+    }
+  ],
+  "tool_usage": {
+    "get_restaurant_context": {
+      "when": [
+        "dynamic variables are missing",
+        "restaurant policy needs refresh",
+        "menu details are unclear"
+      ],
+      "inputs": [
+        "called_number",
+        "caller_id"
+      ]
+    },
+    "create_order": {
+      "when": [
+        "the customer explicitly confirms the summarized order"
+      ],
+      "never_when": [
+        "customer is still deciding",
+        "required customer data is missing",
+        "restaurant rules are violated"
+      ],
+      "inputs": [
+        "restaurant_id",
+        "conversation_id",
+        "customer_name",
+        "customer_phone",
+        "fulfillment_type",
+        "delivery_address",
+        "notes",
+        "items"
+      ]
+    }
+  },
+  "success_criteria": [
+    "The caller hears the correct restaurant identity within the first answer.",
+    "No unavailable delivery or pickup option is offered.",
+    "Only valid menu items are summarized.",
+    "No order is created before an explicit confirmation.",
+    "The stored order total matches the spoken summary."
+  ],
+  "post_call_expectations": {
+    "persist_webhook_event": true,
+    "store_order_reference_if_created": true,
+    "review_for_failure_patterns": [
+      "restaurant lookup failures",
+      "menu mismatches",
+      "minimum order conflicts",
+      "handoff requests"
+    ]
+  }
+}

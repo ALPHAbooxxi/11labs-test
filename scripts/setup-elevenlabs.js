@@ -45,6 +45,16 @@ function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function loadWorkflow() {
+  const workflowPath = path.join(
+    process.cwd(),
+    "config",
+    "elevenlabs",
+    "workflow.pizza-bot.json"
+  );
+  return loadJson(workflowPath);
+}
+
 function deepReplace(value, replacements) {
   if (typeof value === "string") {
     let result = value;
@@ -157,6 +167,7 @@ async function createAgent(toolIds) {
     "__TOOL_GET_RESTAURANT_CONTEXT_ID__": toolIds.getRestaurantContext,
     "__TOOL_CREATE_ORDER_ID__": toolIds.createOrder
   });
+  payload.workflow = loadWorkflow();
 
   return apiRequest("POST", "/convai/agents/create?enable_versioning=true", payload);
 }
@@ -173,6 +184,7 @@ async function updateAgent(agentId, toolIds) {
     "__TOOL_GET_RESTAURANT_CONTEXT_ID__": toolIds.getRestaurantContext,
     "__TOOL_CREATE_ORDER_ID__": toolIds.createOrder
   });
+  payload.workflow = loadWorkflow();
 
   return apiRequest(
     "PATCH",
@@ -230,7 +242,8 @@ async function main() {
       {
         agent_id: verifiedAgent.agent_id,
         tool_ids: attachedToolIds,
-        workflow_present: Boolean(verifiedAgent.workflow)
+        workflow_present: Boolean(verifiedAgent.workflow),
+        workflow_name: verifiedAgent?.workflow?.workflow_name || null
       },
       null,
       2

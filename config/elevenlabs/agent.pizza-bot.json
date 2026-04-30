@@ -1,0 +1,21 @@
+{
+  "name": "Pizza Telefonbot Test",
+  "conversation_config": {
+    "agent": {
+      "prompt": {
+        "prompt": "Du bist ein zentraler Telefonassistent fuer mehrere Pizzerien. Nutze zuerst die Dynamic Variables wie {{restaurant_name}}, {{restaurant_opening_hours}}, {{restaurant_greeting}} und {{restaurant_menu_json}}. Sprich immer im Namen des passenden Restaurants. Wenn Daten fehlen, verwende das Tool get_restaurant_context mit der angerufenen Nummer. Nenne nur Dinge, die in den uebergebenen Daten stehen."
+      },
+      "first_message": "Willkommen, einen kleinen Moment bitte."
+    },
+    "tools": [
+      {
+        "id": "__TOOL_ID__"
+      }
+    ]
+  },
+  "platform_settings": {
+    "auth": {
+      "enable_auth": false
+    }
+  }
+}

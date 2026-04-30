@@ -1,0 +1,12 @@
+{
+  "conversation_initiation_client_data_webhook": {
+    "url": "__PUBLIC_BASE_URL__/api/pre-call",
+    "request_headers": {}
+  },
+  "webhooks": {
+    "post_call_transcription": {
+      "enabled": true,
+      "url": "__PUBLIC_BASE_URL__/api/post-call"
+    }
+  }
+}

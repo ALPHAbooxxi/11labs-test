@@ -1,0 +1,30 @@
+{
+  "tool_config": {
+    "type": "webhook",
+    "name": "get_restaurant_context",
+    "description": "Laedt anhand der angerufenen Nummer die passende Pizzeria und liefert Begruessung, Oeffnungszeiten und Speisekarte.",
+    "response_timeout_secs": 10,
+    "api_schema": {
+      "url": "__PUBLIC_BASE_URL__/api/tool/get-restaurant-context",
+      "method": "POST",
+      "content_type": "application/json",
+      "request_body_schema": {
+        "type": "object",
+        "required": [
+          "called_number"
+        ],
+        "properties": {
+          "called_number": {
+            "type": "string",
+            "description": "Die angerufene Restaurantnummer im E.164-Format."
+          },
+          "caller_id": {
+            "type": "string",
+            "description": "Optional die Rufnummer des Anrufers."
+          }
+        }
+      },
+      "request_headers": {}
+    }
+  }
+}

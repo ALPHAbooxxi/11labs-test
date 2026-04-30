@@ -1,411 +1,833 @@
 {
-  "workflow_name": "pizza-bot-multi-restaurant-order-flow",
-  "version": "1.0.0",
-  "scope": "all-restaurants",
-  "description": "Deterministic call workflow for all restaurants. Restaurant-specific behavior is driven by dynamic variables and restaurant settings from Supabase.",
-  "entry_state": "identify_restaurant",
-  "terminal_states": [
-    "close_after_information",
-    "close_after_order",
-    "handoff_to_human",
-    "close_unresolved"
-  ],
-  "restaurant_rules": {
-    "lookup_key": "called_number",
-    "dynamic_variables": [
-      "restaurant_id",
-      "restaurant_name",
-      "restaurant_phone_number",
-      "restaurant_greeting",
-      "restaurant_address",
-      "restaurant_opening_hours",
-      "restaurant_menu_json",
-      "restaurant_delivery_enabled",
-      "restaurant_pickup_enabled",
-      "restaurant_minimum_order_amount",
-      "restaurant_delivery_fee",
-      "restaurant_delivery_area_notes",
-      "restaurant_payment_methods_json",
-      "restaurant_handoff_phone_number",
-      "restaurant_special_notes"
-    ]
-  },
-  "intents": [
-    {
-      "id": "new_order",
-      "examples": [
-        "Ich moechte bestellen",
-        "Ich haette gern zwei Pizzen",
-        "Ich brauche Lieferung"
-      ]
+  "edges": {
+    "edge_start_to_greeting": {
+      "source": "start_node",
+      "target": "node_greeting",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    {
-      "id": "opening_hours",
-      "examples": [
-        "Wie lange habt ihr offen",
-        "Wann schliesst ihr"
-      ]
+    "edge_greeting_to_state": {
+      "source": "node_greeting",
+      "target": "node_init_state",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    {
-      "id": "address",
-      "examples": [
-        "Wo seid ihr",
-        "Wie ist eure Adresse"
-      ]
+    "edge_state_to_router": {
+      "source": "node_init_state",
+      "target": "node_intent_router",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    {
-      "id": "delivery_rules",
-      "examples": [
-        "Liefert ihr",
-        "Was kostet die Lieferung",
-        "Gibt es einen Mindestbestellwert"
-      ]
+    "edge_router_to_info": {
+      "source": "node_intent_router",
+      "target": "node_info_assistant",
+      "forward_condition": {
+        "label": "Infofrage",
+        "type": "llm",
+        "condition": "Der Anrufer fragt nach Oeffnungszeiten, Adresse, Lieferregeln, Mindestbestellwert, Liefergebuehr, Zahlungsarten oder allgemeinen Restaurantinformationen und moechte keine Bestellung starten."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "payment_question",
-      "examples": [
-        "Kann ich mit Karte zahlen",
-        "Welche Zahlungsmittel akzeptiert ihr"
-      ]
+    "edge_router_to_order": {
+      "source": "node_intent_router",
+      "target": "node_order_start",
+      "forward_condition": {
+        "label": "Neue Bestellung",
+        "type": "llm",
+        "condition": "Der Anrufer moechte Essen oder Getraenke bestellen, eine bestehende Bestellung zusammenstellen oder nach Menueartikeln fragen mit dem Ziel zu bestellen."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "human_handoff",
-      "examples": [
-        "Ich will mit jemandem sprechen",
-        "Verbinden Sie mich bitte"
-      ]
+    "edge_router_to_handoff": {
+      "source": "node_intent_router",
+      "target": "node_handoff_assistant",
+      "forward_condition": {
+        "label": "Fallback oder Mensch",
+        "type": "llm",
+        "condition": "Der Anrufer moechte mit dem Restaurant, einem Mitarbeiter oder jemandem vor Ort sprechen, hat eine Reklamation, eine komplexe Sonderanfrage, Catering, Allergiefragen, oder der Bot ist unsicher beziehungsweise ueberfordert."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "unsupported_request",
-      "examples": [
-        "Ich habe eine Reklamation",
-        "Ich brauche Catering fuer morgen"
-      ]
-    }
-  ],
-  "slots": {
-    "order_items": {
-      "required_for": [
-        "new_order"
-      ],
-      "shape": [
-        "item_name",
-        "item_size",
-        "quantity",
-        "special_instructions"
-      ]
+    "edge_info_to_context": {
+      "source": "node_info_assistant",
+      "target": "node_get_context_info",
+      "forward_condition": {
+        "label": "Daten fehlen",
+        "type": "llm",
+        "condition": "Die vorhandenen Dynamic Variables reichen nicht aus, um die Frage sicher und ohne Raten zu beantworten."
+      },
+      "backward_condition": null
     },
-    "fulfillment_type": {
-      "required_for": [
-        "new_order"
-      ],
-      "allowed_values": [
-        "pickup",
-        "delivery"
-      ]
+    "edge_info_to_end": {
+      "source": "node_info_assistant",
+      "target": "node_info_end",
+      "forward_condition": {
+        "label": "Info beantwortet",
+        "type": "llm",
+        "condition": "Die Frage wurde beantwortet und der Anrufer moechte keine Bestellung starten und keine Weiterleitung."
+      },
+      "backward_condition": null
     },
-    "customer_name": {
-      "required_for": [
-        "pickup",
-        "delivery"
-      ]
+    "edge_context_to_info_response": {
+      "source": "node_get_context_info",
+      "target": "node_info_response_after_context",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    "customer_phone": {
-      "required_for": [
-        "delivery"
-      ]
+    "edge_info_response_to_end": {
+      "source": "node_info_response_after_context",
+      "target": "node_info_end",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    "delivery_address": {
-      "required_for": [
-        "delivery"
-      ]
-    }
-  },
-  "states": [
-    {
-      "id": "identify_restaurant",
-      "goal": "Read dynamic variables from pre-call and bind the conversation to the correct restaurant.",
-      "checks": [
-        "restaurant_id exists",
-        "restaurant_name exists",
-        "restaurant_menu_json is present or can be refreshed via get_restaurant_context"
-      ]
+    "edge_order_start_to_items": {
+      "source": "node_order_start",
+      "target": "node_order_intake",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    {
-      "id": "greet",
-      "goal": "Use restaurant_greeting and immediately speak in the name of the matched restaurant.",
-      "speak_style": "brief, warm, direct"
+    "edge_items_to_context": {
+      "source": "node_order_intake",
+      "target": "node_get_context_order",
+      "forward_condition": {
+        "label": "Menue unklar",
+        "type": "llm",
+        "condition": "Ein Menueartikel, eine Groesse, ein Preis oder eine Restaurantregel ist unklar und muss ueber get_restaurant_context geprueft werden."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "classify_intent",
-      "goal": "Route call into one of: new_order, opening_hours, address, delivery_rules, payment_question, human_handoff, unsupported_request.",
-      "fallback_question": "Wie kann ich Ihnen fuer {{restaurant_name}} helfen"
+    "edge_context_to_order": {
+      "source": "node_get_context_order",
+      "target": "node_order_intake_after_context",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    {
-      "id": "handle_information_request",
-      "goal": "Answer only from restaurant variables or get_restaurant_context.",
-      "allowed_topics": [
-        "opening_hours",
-        "address",
-        "delivery_rules",
-        "payment_question"
-      ]
+    "edge_order_after_context_to_checkout": {
+      "source": "node_order_intake_after_context",
+      "target": "node_checkout",
+      "forward_condition": {
+        "label": "Warenkorb bereit",
+        "type": "llm",
+        "condition": "Nach dem Kontext-Tool sind alle Artikel, Mengen, Groessen und Sonderwuensche ausreichend geklaert."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "collect_order_items",
-      "goal": "Capture item_name, item_size, quantity and special instructions using the actual menu only.",
-      "rules": [
-        "Never invent menu items",
-        "If size is ambiguous, ask a direct follow-up",
-        "If multiple items are ordered, confirm each one clearly"
-      ]
+    "edge_order_after_context_to_handoff": {
+      "source": "node_order_intake_after_context",
+      "target": "node_handoff_assistant",
+      "forward_condition": {
+        "label": "Weiterhin unklar",
+        "type": "llm",
+        "condition": "Auch nach dem Kontext-Tool ist eine sichere Bestellung nicht moeglich oder der Anrufer will mit dem Restaurant sprechen."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "collect_fulfillment",
-      "goal": "Ask for pickup or delivery and enforce restaurant_delivery_enabled and restaurant_pickup_enabled.",
-      "decision_logic": [
-        "If only delivery is enabled, do not offer pickup",
-        "If only pickup is enabled, do not offer delivery",
-        "If both are enabled, ask the caller to choose"
-      ]
+    "edge_items_to_checkout": {
+      "source": "node_order_intake",
+      "target": "node_checkout",
+      "forward_condition": {
+        "label": "Warenkorb bereit",
+        "type": "llm",
+        "condition": "Alle gewuenschten Artikel, Mengen, Groessen und Sonderwuensche wurden ausreichend geklaert."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "collect_customer_data",
-      "goal": "For delivery: collect name, callback number and full address. For pickup: collect at least name.",
-      "data_capture_rules": [
-        "Repeat phone numbers and addresses back when confidence is low",
-        "Keep each question atomic",
-        "Do not move forward if required details are missing"
-      ]
+    "edge_items_to_handoff": {
+      "source": "node_order_intake",
+      "target": "node_handoff_assistant",
+      "forward_condition": {
+        "label": "Bestellung eskalieren",
+        "type": "llm",
+        "condition": "Der Anrufer will mit dem Restaurant sprechen, die Bestellung ist zu komplex, der Bot versteht den Anrufer wiederholt nicht oder eine sichere Bestellung ist nicht moeglich."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "validate_rules",
-      "goal": "Check delivery availability, minimum order value, payment methods and any special restaurant notes.",
-      "validation_order": [
-        "menu validity",
-        "fulfillment availability",
-        "minimum order amount",
-        "delivery fee",
-        "payment methods",
-        "special notes"
-      ]
+    "edge_checkout_to_revision": {
+      "source": "node_checkout",
+      "target": "node_order_revision",
+      "forward_condition": {
+        "label": "Aenderung",
+        "type": "llm",
+        "condition": "Der Anrufer moechte Artikel, Mengen, Groessen, Lieferart oder Kundendaten aendern."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "summarize_order",
-      "goal": "Read back items, quantities, fulfillment type, address if applicable, subtotal, delivery fee and total.",
-      "must_include": [
-        "restaurant_name",
-        "all items",
-        "item quantities",
-        "pickup or delivery",
-        "delivery address if applicable",
-        "subtotal",
-        "delivery fee if applicable",
-        "grand total"
-      ]
+    "edge_revision_to_checkout_retry": {
+      "source": "node_order_revision",
+      "target": "node_checkout_retry",
+      "forward_condition": {
+        "label": "Korrektur abgeschlossen",
+        "type": "llm",
+        "condition": "Die gewuenschte Aenderung wurde geklaert und die Bestellung kann erneut zusammengefasst werden."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "confirm_order",
-      "goal": "Require an explicit confirmation before writing the order.",
-      "accepted_confirmations": [
-        "ja",
-        "das passt",
-        "bitte so bestellen",
-        "bestellen"
-      ]
+    "edge_revision_to_handoff": {
+      "source": "node_order_revision",
+      "target": "node_handoff_assistant",
+      "forward_condition": {
+        "label": "Korrektur eskalieren",
+        "type": "llm",
+        "condition": "Die Aenderung ist zu komplex, bleibt unklar oder der Anrufer will mit dem Restaurant sprechen."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "persist_order",
-      "goal": "Call create_order exactly once after confirmation.",
-      "tool": "create_order",
-      "payload_requirements": [
-        "restaurant_id",
-        "customer_name",
-        "fulfillment_type",
-        "items"
-      ]
+    "edge_checkout_retry_to_create": {
+      "source": "node_checkout_retry",
+      "target": "node_create_order",
+      "forward_condition": {
+        "label": "Erneut bestaetigt",
+        "type": "llm",
+        "condition": "Der Anrufer hat die korrigierte Zusammenfassung eindeutig bestaetigt. Alle Pflichtdaten sind vorhanden."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "close_after_information",
-      "goal": "Close politely after answering an information request."
+    "edge_checkout_retry_to_handoff": {
+      "source": "node_checkout_retry",
+      "target": "node_handoff_assistant",
+      "forward_condition": {
+        "label": "Retry Fallback",
+        "type": "llm",
+        "condition": "Nach der Korrektur ist weiterhin keine sichere Bestellung moeglich oder der Anrufer will mit dem Restaurant sprechen."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "close_after_order",
-      "goal": "Confirm that the order was saved and close politely."
+    "edge_checkout_to_handoff": {
+      "source": "node_checkout",
+      "target": "node_handoff_assistant",
+      "forward_condition": {
+        "label": "Checkout Fallback",
+        "type": "llm",
+        "condition": "Lieferung oder Abholung ist nach Restaurantregeln nicht moeglich, der Mindestbestellwert wird nicht erreicht und der Anrufer will nicht anpassen, Pflichtdaten koennen nicht sicher erfasst werden oder der Anrufer will mit dem Restaurant sprechen."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "handoff_to_human",
-      "goal": "Offer the restaurant_handoff_phone_number or promise a callback if the request cannot be resolved automatically."
+    "edge_checkout_to_create": {
+      "source": "node_checkout",
+      "target": "node_create_order",
+      "forward_condition": {
+        "label": "Explizit bestaetigt",
+        "type": "llm",
+        "condition": "Der Anrufer hat die vollstaendige Zusammenfassung inklusive Artikeln, Lieferart, Adresse falls Lieferung und Gesamtbetrag eindeutig bestaetigt. Alle Pflichtdaten sind vorhanden."
+      },
+      "backward_condition": null
     },
-    {
-      "id": "close_unresolved",
-      "goal": "Close politely if the request remains unsupported and no handoff option exists."
-    }
-  ],
-  "transitions": [
-    {
-      "from": "identify_restaurant",
-      "to": "greet"
+    "edge_create_to_success": {
+      "source": "node_create_order",
+      "target": "node_order_success",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    {
-      "from": "greet",
-      "to": "classify_intent"
+    "edge_success_to_end": {
+      "source": "node_order_success",
+      "target": "node_order_end",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     },
-    {
-      "from": "classify_intent",
-      "to": "handle_information_request",
-      "when": "intent in [opening_hours, address, delivery_rules, payment_question]"
+    "edge_handoff_to_transfer": {
+      "source": "node_handoff_assistant",
+      "target": "node_phone_transfer",
+      "forward_condition": {
+        "label": "Weiterleiten",
+        "type": "llm",
+        "condition": "Der Anrufer moechte direkt mit dem Restaurant sprechen oder der Bot ist ueberfordert. restaurant_handoff_phone_number ist vorhanden."
+      },
+      "backward_condition": null
     },
-    {
-      "from": "classify_intent",
-      "to": "collect_order_items",
-      "when": "intent == new_order"
+    "edge_handoff_to_say_number": {
+      "source": "node_handoff_assistant",
+      "target": "node_say_fallback_number",
+      "forward_condition": {
+        "label": "Nummer nennen",
+        "type": "llm",
+        "condition": "Eine direkte Weiterleitung ist nicht passend oder nicht moeglich, aber die Fallback-Nummer soll genannt werden."
+      },
+      "backward_condition": null
     },
-    {
-      "from": "classify_intent",
-      "to": "handoff_to_human",
-      "when": "intent == human_handoff or unsupported_request"
-    },
-    {
-      "from": "handle_information_request",
-      "to": "close_after_information"
-    },
-    {
-      "from": "collect_order_items",
-      "to": "collect_fulfillment"
-    },
-    {
-      "from": "collect_fulfillment",
-      "to": "collect_customer_data"
-    },
-    {
-      "from": "collect_customer_data",
-      "to": "validate_rules"
-    },
-    {
-      "from": "validate_rules",
-      "to": "summarize_order",
-      "when": "all rules satisfied"
-    },
-    {
-      "from": "validate_rules",
-      "to": "collect_order_items",
-      "when": "menu ambiguity or item correction required"
-    },
-    {
-      "from": "validate_rules",
-      "to": "collect_fulfillment",
-      "when": "fulfillment conflict or unavailable delivery/pickup"
-    },
-    {
-      "from": "summarize_order",
-      "to": "confirm_order"
-    },
-    {
-      "from": "confirm_order",
-      "to": "persist_order",
-      "when": "customer explicitly confirms"
-    },
-    {
-      "from": "confirm_order",
-      "to": "collect_order_items",
-      "when": "customer changes items"
-    },
-    {
-      "from": "persist_order",
-      "to": "close_after_order"
-    },
-    {
-      "from": "handoff_to_human",
-      "to": "close_unresolved",
-      "when": "no direct transfer is possible"
-    }
-  ],
-  "restaurant_specific_rules": [
-    "If restaurant_delivery_enabled is false, do not offer delivery.",
-    "If restaurant_pickup_enabled is false, do not offer pickup.",
-    "If delivery is chosen, enforce restaurant_minimum_order_amount and add restaurant_delivery_fee.",
-    "Only mention payment methods listed in restaurant_payment_methods_json.",
-    "If the caller asks for something outside the menu or policy, offer the handoff number from restaurant_handoff_phone_number if available.",
-    "Always honor restaurant_special_notes."
-  ],
-  "conversation_policies": [
-    "Keep turns short and phone-friendly.",
-    "Ask at most one missing critical question at a time.",
-    "Do not guess on menu, pricing, address, payment or policy details.",
-    "If the caller is unclear, summarize what has been understood and ask a correction question.",
-    "If there is background noise or ASR uncertainty, reconfirm critical slots before create_order."
-  ],
-  "failure_modes": [
-    {
-      "id": "missing_restaurant_context",
-      "action": "Call get_restaurant_context once using called_number, otherwise apologize and close."
-    },
-    {
-      "id": "invalid_menu_item",
-      "action": "Explain that the item is not on the menu and offer nearby alternatives from the actual menu."
-    },
-    {
-      "id": "size_mismatch",
-      "action": "Ask which valid size the caller wants before continuing."
-    },
-    {
-      "id": "minimum_order_not_met",
-      "action": "Explain the minimum order amount and ask whether the caller wants to add items or switch to pickup."
-    },
-    {
-      "id": "unsupported_request",
-      "action": "Offer handoff_phone_number if available, otherwise apologize and close."
-    }
-  ],
-  "tool_usage": {
-    "get_restaurant_context": {
-      "when": [
-        "dynamic variables are missing",
-        "restaurant policy needs refresh",
-        "menu details are unclear"
-      ],
-      "inputs": [
-        "called_number",
-        "caller_id"
-      ]
-    },
-    "create_order": {
-      "when": [
-        "the customer explicitly confirms the summarized order"
-      ],
-      "never_when": [
-        "customer is still deciding",
-        "required customer data is missing",
-        "restaurant rules are violated"
-      ],
-      "inputs": [
-        "restaurant_id",
-        "conversation_id",
-        "customer_name",
-        "customer_phone",
-        "fulfillment_type",
-        "delivery_address",
-        "notes",
-        "items"
-      ]
+    "edge_say_number_to_end": {
+      "source": "node_say_fallback_number",
+      "target": "node_handoff_end",
+      "forward_condition": {
+        "label": null,
+        "type": "unconditional"
+      },
+      "backward_condition": null
     }
   },
-  "success_criteria": [
-    "The caller hears the correct restaurant identity within the first answer.",
-    "No unavailable delivery or pickup option is offered.",
-    "Only valid menu items are summarized.",
-    "No order is created before an explicit confirmation.",
-    "The stored order total matches the spoken summary."
-  ],
-  "post_call_expectations": {
-    "persist_webhook_event": true,
-    "store_order_reference_if_created": true,
-    "review_for_failure_patterns": [
-      "restaurant lookup failures",
-      "menu mismatches",
-      "minimum order conflicts",
-      "handoff requests"
-    ]
-  }
+  "nodes": {
+    "start_node": {
+      "type": "start",
+      "position": {
+        "x": 0,
+        "y": -460
+      },
+      "edge_order": [
+        "edge_start_to_greeting"
+      ]
+    },
+    "node_greeting": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [],
+      "type": "say",
+      "position": {
+        "x": 0,
+        "y": -330
+      },
+      "edge_order": [
+        "edge_greeting_to_state"
+      ],
+      "label": "Begruessung",
+      "message": {
+        "type": "literal",
+        "text": "{{restaurant_greeting}}"
+      }
+    },
+    "node_init_state": {
+      "type": "update_state",
+      "position": {
+        "x": 0,
+        "y": -190
+      },
+      "edge_order": [
+        "edge_state_to_router"
+      ],
+      "label": "Restaurant-Kontext merken",
+      "updates": []
+    },
+    "node_intent_router": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Du bist der Intent Router fuer {{restaurant_name}}. Frage kurz, wie du helfen kannst, falls der Wunsch noch nicht klar ist. Route zu Info, Bestellung oder Fallback. Wenn der Anrufer mit dem Restaurant, einem Mitarbeiter oder jemandem vor Ort sprechen will, route immer zum Fallback. Wenn du unsicher bist oder dich ueberfordert fuehlst, route ebenfalls zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [],
+      "type": "override_agent",
+      "position": {
+        "x": 0,
+        "y": -40
+      },
+      "edge_order": [
+        "edge_router_to_order",
+        "edge_router_to_info",
+        "edge_router_to_handoff"
+      ],
+      "label": "Intent Router",
+      "auto_advance_after_first_response": false
+    },
+    "node_info_assistant": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Beantworte Informationsfragen zu {{restaurant_name}} nur aus den Dynamic Variables oder aus get_restaurant_context. Erfinde keine Oeffnungszeiten, Adresse, Liefergebiete, Preise oder Zahlungsarten. Bei fehlenden Daten nutze get_restaurant_context. Wenn der Kunde danach bestellen moechte, leite zur Bestellung zurueck. Wenn er mit dem Restaurant sprechen will oder du unsicher bist, leite zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [
+        "__TOOL_GET_RESTAURANT_CONTEXT_ID__"
+      ],
+      "type": "override_agent",
+      "position": {
+        "x": -420,
+        "y": 150
+      },
+      "edge_order": [
+        "edge_info_to_context",
+        "edge_info_to_end"
+      ],
+      "label": "Info Assistant",
+      "auto_advance_after_first_response": false
+    },
+    "node_get_context_info": {
+      "type": "tool",
+      "position": {
+        "x": -420,
+        "y": 340
+      },
+      "edge_order": [
+        "edge_context_to_info_response"
+      ],
+      "tools": [
+        {
+          "tool_id": "__TOOL_GET_RESTAURANT_CONTEXT_ID__"
+        }
+      ]
+    },
+    "node_info_response_after_context": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Beantworte die Informationsfrage jetzt mit den aktualisierten Restaurantdaten aus get_restaurant_context. Wenn die Frage weiterhin nicht sicher beantwortbar ist oder der Kunde mit dem Restaurant sprechen will, leite zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [],
+      "type": "override_agent",
+      "position": {
+        "x": -420,
+        "y": 520
+      },
+      "edge_order": [
+        "edge_info_response_to_end"
+      ],
+      "label": "Info Antwort nach Tool",
+      "auto_advance_after_first_response": false
+    },
+    "node_info_end": {
+      "type": "end",
+      "position": {
+        "x": -670,
+        "y": 340
+      },
+      "edge_order": []
+    },
+    "node_order_start": {
+      "type": "update_state",
+      "position": {
+        "x": 0,
+        "y": 150
+      },
+      "edge_order": [
+        "edge_order_start_to_items"
+      ],
+      "label": "Bestellung starten",
+      "updates": []
+    },
+    "node_order_intake": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Nimm die Bestellung fuer {{restaurant_name}} strukturiert auf. Nutze ausschliesslich Artikel aus {{restaurant_menu_json}} oder aus get_restaurant_context. Klaere pro Artikel item_name, item_size falls relevant, quantity und special_instructions. Frage bei unklaren Groessen oder Artikeln nach. Wenn der Kunde etwas will, das nicht auf der Karte steht, biete echte Alternativen an oder leite zum Fallback. Wenn der Kunde mit dem Restaurant sprechen will oder du mehrfach unsicher bist, leite zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [
+        "__TOOL_GET_RESTAURANT_CONTEXT_ID__"
+      ],
+      "type": "override_agent",
+      "position": {
+        "x": 0,
+        "y": 340
+      },
+      "edge_order": [
+        "edge_items_to_checkout",
+        "edge_items_to_context",
+        "edge_items_to_handoff"
+      ],
+      "label": "Order Intake",
+      "auto_advance_after_first_response": false
+    },
+    "node_get_context_order": {
+      "type": "tool",
+      "position": {
+        "x": 260,
+        "y": 450
+      },
+      "edge_order": [
+        "edge_context_to_order"
+      ],
+      "tools": [
+        {
+          "tool_id": "__TOOL_GET_RESTAURANT_CONTEXT_ID__"
+        }
+      ]
+    },
+    "node_order_intake_after_context": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Nutze die aktualisierten Restaurant- und Menueinformationen aus get_restaurant_context. Klaere die Bestellung weiter, aber erfinde nichts. Wenn weiterhin Unsicherheit besteht oder der Kunde mit dem Restaurant sprechen will, leite zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [
+        "__TOOL_GET_RESTAURANT_CONTEXT_ID__"
+      ],
+      "type": "override_agent",
+      "position": {
+        "x": 260,
+        "y": 630
+      },
+      "edge_order": [
+        "edge_order_after_context_to_checkout",
+        "edge_order_after_context_to_handoff"
+      ],
+      "label": "Order Intake nach Tool",
+      "auto_advance_after_first_response": false
+    },
+    "node_checkout": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Fuehre den Checkout fuer {{restaurant_name}}. Klaere pickup oder delivery. Wenn {{restaurant_delivery_enabled}} false ist, biete keine Lieferung an. Wenn {{restaurant_pickup_enabled}} false ist, biete keine Abholung an. Bei Lieferung erfasse customer_name, customer_phone und delivery_address. Bei Abholung erfasse mindestens customer_name. Beachte Mindestbestellwert {{restaurant_minimum_order_amount}} und Liefergebuehr {{restaurant_delivery_fee}}. Fasse die Bestellung inklusive Artikeln, Mengen, Groessen, Sonderwuenschen, Lieferart, Adresse falls Lieferung, Zwischensumme, Liefergebuehr und Gesamtbetrag zusammen. Rufe create_order erst nach ausdruecklicher Bestaetigung auf. Wenn der Kunde aendern will, gehe zur Bestellung zurueck. Wenn der Kunde mit dem Restaurant sprechen will oder du unsicher bist, leite zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [
+        "__TOOL_CREATE_ORDER_ID__"
+      ],
+      "type": "override_agent",
+      "position": {
+        "x": 0,
+        "y": 560
+      },
+      "edge_order": [
+        "edge_checkout_to_create",
+        "edge_checkout_to_revision",
+        "edge_checkout_to_handoff"
+      ],
+      "label": "Checkout",
+      "auto_advance_after_first_response": false
+    },
+    "node_order_revision": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Klaere die vom Anrufer gewuenschte Aenderung an der Bestellung. Aendere nur das, was der Anrufer korrigieren moechte. Nutze nur echte Menueartikel und echte Restaurantregeln. Wenn die Korrektur zu komplex oder unsicher ist, leite zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [
+        "__TOOL_GET_RESTAURANT_CONTEXT_ID__"
+      ],
+      "type": "override_agent",
+      "position": {
+        "x": -260,
+        "y": 760
+      },
+      "edge_order": [
+        "edge_revision_to_checkout_retry",
+        "edge_revision_to_handoff"
+      ],
+      "label": "Bestellung korrigieren",
+      "auto_advance_after_first_response": false
+    },
+    "node_checkout_retry": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Fasse die korrigierte Bestellung erneut vollstaendig zusammen. Erst nach eindeutiger Bestaetigung darf create_order aufgerufen werden. Wenn weiterhin Unsicherheit besteht oder der Anrufer mit dem Restaurant sprechen will, leite zum Fallback.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [
+        "__TOOL_CREATE_ORDER_ID__"
+      ],
+      "type": "override_agent",
+      "position": {
+        "x": -260,
+        "y": 970
+      },
+      "edge_order": [
+        "edge_checkout_retry_to_create",
+        "edge_checkout_retry_to_handoff"
+      ],
+      "label": "Checkout nach Korrektur",
+      "auto_advance_after_first_response": false
+    },
+    "node_create_order": {
+      "type": "tool",
+      "position": {
+        "x": 0,
+        "y": 790
+      },
+      "edge_order": [
+        "edge_create_to_success"
+      ],
+      "tools": [
+        {
+          "tool_id": "__TOOL_CREATE_ORDER_ID__"
+        }
+      ]
+    },
+    "node_order_success": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [],
+      "type": "say",
+      "position": {
+        "x": 0,
+        "y": 990
+      },
+      "edge_order": [
+        "edge_success_to_end"
+      ],
+      "label": "Bestellung bestaetigen",
+      "message": {
+        "type": "literal",
+        "text": "Vielen Dank. Ihre Bestellung wurde aufgenommen."
+      }
+    },
+    "node_order_end": {
+      "type": "end",
+      "position": {
+        "x": 0,
+        "y": 1130
+      },
+      "edge_order": []
+    },
+    "node_handoff_assistant": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "Du bist der Handoff Assistant. Nutze diesen Pfad immer, wenn der Kunde mit dem Restaurant sprechen will, eine Reklamation hat, eine Sonderanfrage stellt, der Bot ueberfordert ist oder nach mehreren Rueckfragen Unsicherheit bleibt. Erklaere kurz, dass du an {{restaurant_name}} weiterleitest oder die Nummer nennst. Halte den Kunden nicht weiter im Automationsfluss auf.",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [],
+      "type": "override_agent",
+      "position": {
+        "x": 460,
+        "y": 150
+      },
+      "edge_order": [
+        "edge_handoff_to_transfer",
+        "edge_handoff_to_say_number"
+      ],
+      "label": "Fallback / Handoff",
+      "auto_advance_after_first_response": false
+    },
+    "node_phone_transfer": {
+      "custom_sip_headers": [],
+      "transfer_destination": {
+        "type": "phone_dynamic_variable",
+        "phone_number": "restaurant_handoff_phone_number"
+      },
+      "transfer_type": "conference",
+      "post_dial_digits": null,
+      "type": "phone_number",
+      "position": {
+        "x": 460,
+        "y": 360
+      },
+      "edge_order": []
+    },
+    "node_say_fallback_number": {
+      "conversation_config": {
+        "turn": {
+          "turn_eagerness": null,
+          "spelling_patience": null,
+          "speculative_turn": null,
+          "retranscribe_on_turn_timeout": null
+        },
+        "tts": {
+          "voice_id": null
+        },
+        "agent": {
+          "prompt": {
+            "prompt": null,
+            "llm": null,
+            "built_in_tools": {}
+          }
+        }
+      },
+      "additional_prompt": "",
+      "additional_knowledge_base": [],
+      "additional_tool_ids": [],
+      "type": "say",
+      "position": {
+        "x": 700,
+        "y": 360
+      },
+      "edge_order": [
+        "edge_say_number_to_end"
+      ],
+      "label": "Fallback-Nummer nennen",
+      "message": {
+        "type": "literal",
+        "text": "Sie erreichen {{restaurant_name}} direkt unter {{restaurant_handoff_phone_number}}."
+      }
+    },
+    "node_handoff_end": {
+      "type": "end",
+      "position": {
+        "x": 700,
+        "y": 540
+      },
+      "edge_order": []
+    }
+  },
+  "prevent_subagent_loops": false
 }

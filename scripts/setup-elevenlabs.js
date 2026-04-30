@@ -45,14 +45,22 @@ function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
-function loadWorkflow() {
+function loadWorkflow(toolIds) {
   const workflowPath = path.join(
     process.cwd(),
     "config",
     "elevenlabs",
     "workflow.pizza-bot.json"
   );
-  return loadJson(workflowPath);
+  const workflow = loadJson(workflowPath);
+  return deepReplace(workflow, {
+    "__TOOL_GET_RESTAURANT_CONTEXT_ID__": toolIds.getRestaurantContext,
+    "__TOOL_CREATE_ORDER_ID__": toolIds.createOrder
+  });
+}
+
+function shouldIncludeWorkflow() {
+  return String(process.env.ELEVENLABS_ENABLE_WORKFLOW || "").trim().toLowerCase() === "true";
 }
 
 function deepReplace(value, replacements) {
@@ -167,7 +175,9 @@ async function createAgent(toolIds) {
     "__TOOL_GET_RESTAURANT_CONTEXT_ID__": toolIds.getRestaurantContext,
     "__TOOL_CREATE_ORDER_ID__": toolIds.createOrder
   });
-  payload.workflow = loadWorkflow();
+  if (shouldIncludeWorkflow()) {
+    payload.workflow = loadWorkflow(toolIds);
+  }
 
   return apiRequest("POST", "/convai/agents/create?enable_versioning=true", payload);
 }
@@ -184,7 +194,9 @@ async function updateAgent(agentId, toolIds) {
     "__TOOL_GET_RESTAURANT_CONTEXT_ID__": toolIds.getRestaurantContext,
     "__TOOL_CREATE_ORDER_ID__": toolIds.createOrder
   });
-  payload.workflow = loadWorkflow();
+  if (shouldIncludeWorkflow()) {
+    payload.workflow = loadWorkflow(toolIds);
+  }
 
   return apiRequest(
     "PATCH",
@@ -199,6 +211,7 @@ async function getAgent(agentId) {
 
 async function main() {
   const publicBaseUrl = requireEnv("PUBLIC_BASE_URL").replace(/\/$/, "");
+  const workflowEnabled = shouldIncludeWorkflow();
 
   console.log("1. Workspace Webhook anlegen");
   const webhook = await createWorkspaceWebhook(publicBaseUrl);
@@ -243,7 +256,8 @@ async function main() {
         agent_id: verifiedAgent.agent_id,
         tool_ids: attachedToolIds,
         workflow_present: Boolean(verifiedAgent.workflow),
-        workflow_name: verifiedAgent?.workflow?.workflow_name || null
+        workflow_name: verifiedAgent?.workflow?.workflow_name || null,
+        workflow_requested: workflowEnabled
       },
       null,
       2
@@ -260,6 +274,7 @@ async function main() {
   console.log(`Agent ID: ${resolvedAgentId || "unbekannt"}`);
   console.log(`Webhook ID: ${webhook.webhook_id || webhook.id || "unbekannt"}`);
   console.log(`Webhook Secret: ${webhook.webhook_secret || "nicht von API zurueckgegeben"}`);
+  console.log(`Workflow aktiviert: ${workflowEnabled ? "ja" : "nein"}`);
 }
 
 main().catch((error) => {

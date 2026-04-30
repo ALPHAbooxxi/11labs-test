@@ -32,7 +32,15 @@ module.exports = async function handler(req, res) {
         restaurant_greeting: restaurant.greeting,
         restaurant_address: restaurant.address,
         restaurant_opening_hours: restaurant.opening_hours,
-        restaurant_menu_json: JSON.stringify(restaurant.menu || [])
+        restaurant_menu_json: JSON.stringify(restaurant.menu || []),
+        restaurant_delivery_enabled: String(Boolean(restaurant.delivery_enabled)),
+        restaurant_pickup_enabled: String(Boolean(restaurant.pickup_enabled)),
+        restaurant_minimum_order_amount: String(restaurant.minimum_order_amount ?? 0),
+        restaurant_delivery_fee: String(restaurant.delivery_fee ?? 0),
+        restaurant_delivery_area_notes: restaurant.delivery_area_notes || "",
+        restaurant_payment_methods_json: JSON.stringify(restaurant.payment_methods || []),
+        restaurant_handoff_phone_number: restaurant.handoff_phone_number || "",
+        restaurant_special_notes: restaurant.special_notes || ""
       },
       user_id: restaurant.id
     });

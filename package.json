@@ -6,7 +6,9 @@
     "node": "22.x"
   },
   "scripts": {
-    "check": "node --check api/health.js && node --check api/pre-call.js && node --check api/post-call.js && node --check api/tool/get-restaurant-context.js && node --check lib/supabase.js && node --check lib/phone.js && node --check lib/elevenlabs-signature.js && node --check lib/raw-body.js && node --check scripts/setup-elevenlabs.js",
+    "check": "node --check api/health.js && node --check api/pre-call.js && node --check api/post-call.js && node --check api/tool/get-restaurant-context.js && node --check api/tool/create-order.js && node --check lib/supabase.js && node --check lib/phone.js && node --check lib/elevenlabs-signature.js && node --check lib/raw-body.js && node --check scripts/setup-elevenlabs.js && node --check scripts/export-elevenlabs-agent.js && node --check scripts/apply-elevenlabs-workflow.js",
+    "apply:elevenlabs-workflow": "node scripts/apply-elevenlabs-workflow.js",
+    "export:elevenlabs-agent": "node scripts/export-elevenlabs-agent.js",
     "setup:elevenlabs": "node scripts/setup-elevenlabs.js"
   },
   "dependencies": {

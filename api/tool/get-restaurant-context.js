@@ -30,6 +30,14 @@ module.exports = async function handler(req, res) {
       greeting: restaurant.greeting,
       address: restaurant.address,
       opening_hours: restaurant.opening_hours,
+      delivery_enabled: restaurant.delivery_enabled,
+      pickup_enabled: restaurant.pickup_enabled,
+      minimum_order_amount: restaurant.minimum_order_amount,
+      delivery_fee: restaurant.delivery_fee,
+      delivery_area_notes: restaurant.delivery_area_notes,
+      payment_methods: restaurant.payment_methods || [],
+      handoff_phone_number: restaurant.handoff_phone_number,
+      special_notes: restaurant.special_notes,
       menu: restaurant.menu || []
     });
   } catch (error) {

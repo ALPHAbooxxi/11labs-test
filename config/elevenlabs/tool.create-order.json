@@ -1,0 +1,81 @@
+{
+  "tool_config": {
+    "type": "webhook",
+    "name": "create_order",
+    "description": "Speichert eine vom Anrufer bestaetigte Bestellung verbindlich in der Datenbank des passenden Restaurants.",
+    "response_timeout_secs": 10,
+    "api_schema": {
+      "url": "__PUBLIC_BASE_URL__/api/tool/create-order",
+      "method": "POST",
+      "content_type": "application/json",
+      "request_body_schema": {
+        "type": "object",
+        "required": [
+          "restaurant_id",
+          "fulfillment_type",
+          "items"
+        ],
+        "properties": {
+          "restaurant_id": {
+            "type": "string",
+            "description": "Die Restaurant-ID aus den Dynamic Variables."
+          },
+          "conversation_id": {
+            "type": "string",
+            "description": "Optional die aktuelle Conversation-ID."
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "Name des Anrufers."
+          },
+          "customer_phone": {
+            "type": "string",
+            "description": "Rueckrufnummer des Anrufers."
+          },
+          "fulfillment_type": {
+            "type": "string",
+            "description": "delivery oder pickup"
+          },
+          "delivery_address": {
+            "type": "string",
+            "description": "Bei Lieferung die vollstaendige Adresse."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Freitext-Hinweise zur Bestellung."
+          },
+          "items": {
+            "type": "array",
+            "description": "Die bestaetigten Bestellpositionen.",
+            "items": {
+              "type": "object",
+              "required": [
+                "item_name",
+                "quantity"
+              ],
+              "properties": {
+                "item_name": {
+                  "type": "string",
+                  "description": "Name des Menueartikels exakt wie in der Karte."
+                },
+                "item_size": {
+                  "type": "string",
+                  "description": "Optional die Groesse wie klein, mittel oder gross."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "description": "Menge des Artikels."
+                },
+                "special_instructions": {
+                  "type": "string",
+                  "description": "Optional Sonderwuensche fuer diesen Artikel."
+                }
+              }
+            }
+          }
+        }
+      },
+      "request_headers": {}
+    }
+  }
+}

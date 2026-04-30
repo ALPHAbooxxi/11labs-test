@@ -70,14 +70,17 @@ function deepReplace(value, replacements) {
 async function createWorkspaceWebhook(publicBaseUrl) {
   const webhookName = process.env.ELEVENLABS_WEBHOOK_NAME || "pizza-bot-post-call";
   const payload = {
-    name: webhookName,
-    url: `${publicBaseUrl}/api/post-call`
+    settings: {
+      name: webhookName,
+      webhook_url: `${publicBaseUrl}/api/post-call`,
+      auth_type: "hmac"
+    }
   };
 
   return apiRequest("POST", "/workspace/webhooks", payload);
 }
 
-async function updateConvaiSettings(publicBaseUrl) {
+async function updateConvaiSettings(publicBaseUrl, postCallWebhookId) {
   const templatePath = path.join(
     process.cwd(),
     "config",
@@ -93,6 +96,10 @@ async function updateConvaiSettings(publicBaseUrl) {
   if (optionalAuthToken) {
     payload.conversation_initiation_client_data_webhook.request_headers.Authorization =
       `Bearer ${optionalAuthToken}`;
+  }
+
+  if (postCallWebhookId) {
+    payload.webhooks.post_call_webhook_id = postCallWebhookId;
   }
 
   return apiRequest("PATCH", "/convai/settings", payload);
@@ -136,13 +143,16 @@ async function createAgent(toolId) {
 async function main() {
   const publicBaseUrl = requireEnv("PUBLIC_BASE_URL").replace(/\/$/, "");
 
-  console.log("1. ConvAI Settings aktualisieren");
-  const settings = await updateConvaiSettings(publicBaseUrl);
-  console.log(JSON.stringify(settings, null, 2));
-
-  console.log("\n2. Workspace Webhook anlegen");
+  console.log("1. Workspace Webhook anlegen");
   const webhook = await createWorkspaceWebhook(publicBaseUrl);
   console.log(JSON.stringify(webhook, null, 2));
+
+  console.log("\n2. ConvAI Settings aktualisieren");
+  const settings = await updateConvaiSettings(
+    publicBaseUrl,
+    webhook.webhook_id || webhook.id || null
+  );
+  console.log(JSON.stringify(settings, null, 2));
 
   console.log("\n3. Server Tool anlegen");
   const tool = await createServerTool(publicBaseUrl);
@@ -158,7 +168,8 @@ async function main() {
   console.log(`Tool URL: ${publicBaseUrl}/api/tool/get-restaurant-context`);
   console.log(`Tool ID: ${tool.id}`);
   console.log(`Agent ID: ${agent.agent_id || agent.id || "unbekannt"}`);
-  console.log(`Webhook ID: ${webhook.id || "unbekannt"}`);
+  console.log(`Webhook ID: ${webhook.webhook_id || webhook.id || "unbekannt"}`);
+  console.log(`Webhook Secret: ${webhook.webhook_secret || "nicht von API zurueckgegeben"}`);
 }
 
 main().catch((error) => {
